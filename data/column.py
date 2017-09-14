@@ -35,3 +35,5 @@ class DataType(Enum):
 DATA_TYPE_NAMES = [DataType.Text.value, DataType.Integer.value,\
 DataType.Decimal.value, DataType.Blob.value]
 DATA_TYPES = [DataType.Text, DataType.Integer, DataType.Decimal, DataType.Blob]
+DATA_TYPES_DICT = {'TEXT': DATA_TYPES[0], 'INTEGER': DATA_TYPES[1],\
+'REAL': DATA_TYPES[2], 'BLOB': DATA_TYPES[3]}

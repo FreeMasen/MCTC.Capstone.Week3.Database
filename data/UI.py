@@ -1,5 +1,6 @@
 '''User interface'''
 import os
+from pathlib import Path
 import monotable.table
 from data.interaction import Interaction
 from data.column import *
@@ -28,24 +29,23 @@ class UserInterface():
         'Remove an ingredient',\
         'Update an ingredient',\
         'Show all ingredients',\
-        'Show one ingredient']
+        'Show one ingredient',\
+        'Quit']
         self._display_options(menu_options)
-        return Interaction(self._ask_digit('What would you like to do', 6))
+        return Interaction(self._ask_index('What would you like to do', 7))
     def show_option(self, interaction):
+        '''show the first step in the request process'''
         value = interaction.initial_value
-        if value == 0:
+        if value == 0: #create table
             return self.create_database_and_table(interaction)
-        if value == 1:
+        elif value == 6:
+            self.exit = True
+            interaction
+        else:
             self._display_options(interaction.table_names)
-            table_index = self._ask_digit('Which table would you like to modify', len(interaction.table_names))
+            table_index = self._ask_index('Which table', len(interaction.table_names))
             interaction.table_name = interaction.table_names[table_index]
-            return interaction
-        if value == 2:
-            return
-        if value == 3:
-            return
-        if value == 4:
-            return
+        return interaction
     def create_database_and_table(self, interaction):
         '''Confirm the creation of databases and tables'''
         print('Currently you have the following tables')
@@ -57,7 +57,7 @@ class UserInterface():
             while True:
                 col_name = self._ask_and_confirm('What would you like to name your new column?')
                 self._display_options(DATA_TYPE_NAMES)
-                col_type_index = self._ask_digit('What type of data would you like to add?', len(DATA_TYPE_NAMES))
+                col_type_index = self._ask_index('What type of data would you like to add?', len(DATA_TYPE_NAMES))
                 col_type = DATA_TYPES[col_type_index]
                 interaction.columns.append(Column(col_name, col_type))
                 if not self._ask_bool('Create another column'): break
@@ -67,18 +67,49 @@ class UserInterface():
     def add_item(self, interaction, table):
         '''add an item to the table named in interaction'''
         self.display_table(interaction.table_name, table)
-        for column in table.columns:
-            if not column == 'id' or column == 'rowid':
-                interaction.row_to_add.append(self._ask_and_confirm('What would you like to add for %s' % column))
+        for i, column in enumerate(table.columns):
+            if column == 'id' or column == 'rowid':
+                continue
+            data_type = table.types[i]
+            val = None
+            if data_type == DataType.Text:
+                self._ask_string('What text would you like for %s' % column)
+            elif data_type == DataType.Decimal:
+                val = self._ask_decimal('What decimal would you like for %s' % column)
+            elif data_type == DataType.Integer:
+                val = self._ask_int('What whole number would you like for %s' % column)
+            elif data_type == DataType.Blob:
+                val = self._ask_path('What file would you like to use for %s' % column)
+            interaction.row_to_add.append(Column(val, data_type))
         return interaction
-    def remove_item(self):
-        pass
-    def update_item(self):
-        pass
-    def show_all_items(self):
-        pass
-    def show_one_item(self):
-        pass
+    def remove_item(self, interaction):
+        self.display_table(interaction.table_name, interaction.table)
+        interaction.row_id = self._ask_int('What is the ID of the row you would like to remove')
+        return interaction
+    def update_item(self, interaction):
+        self.display_table(interaction.table_name, interaction.table)
+        interaction.row_id = self._ask_int('What is the id of the row you would like to update')
+        self._display_options(interaction.table.columns)
+        column_index = self._ask_index('Which column would you like to udpate', len(interaction.table.columns))
+        column_type = interaction.table.types[column_index]
+        interaction.column = interaction.table.columns[column_index]
+        question = 'What is the new value'
+        if column_type == DataType.Text:
+            interaction.value = self._ask_string(question)
+        if column_type == DataType.Integer:
+            interaction.value = self._ask_int(question)
+        if column_type == DataType.Decimal:
+            interaction.value = self._ask_decimal(question)
+        if column_type == DataType.Blob:
+            interaction.value = self._ask_path(question)
+        return interaction
+    def show_all_items(self, interaction):
+        self._display_options(interaction.table_names)
+        self._ask_index('Which table would you like to see', len(interaction.table_names))
+    def show_one_item(self, Interaction):
+        print('%s has %s rows' % (Interaction.table_name, len(Interaction.table.values)))
+        Interaction.row_id = self._ask_int('What is the id of row you want to see')
+        return Interaction
     def display_table(self, title, query_result):
         '''display the table of data'''
         table_values = query_result.values if len(query_result.values) > 0 else [list('-' * len(query_result.columns))]
@@ -89,19 +120,41 @@ class UserInterface():
             print('%s. %s'.center(int(self.banner_width / 2) + 8) % (i + 1, option))
     def _clear(self):
         os.system('cls' if os.name == 'nt' else 'clear')
-    def _ask_digit(self, question, max_val):
+    def _ask_int(self, question, max_val = float('inf')):
         while True:
             try:
                 val = input(question + '?\n')
                 ret = int(val)
                 if ret <= max_val:
-                    return ret - 1
+                    return ret
+                raise ValueError
             except:
                 print('I\'m sorry, I didn\'t get that. Please enter a value between 1 and %s' % max_val)
+    def _ask_index(self, question, max_val):
+        return self._ask_int(question, max_val) - 1
+    def _ask_decimal(self, question, max_val = float('inf')):
+        while True:
+            val = input(question + '?\n')
+            try:
+                ret = float(val)
+                if ret <= max_val:
+                    return ret
+                raise ValueError
+            except:
+                print('I didn\'t get that plese enter a valid number')
+    def _ask_path(self, question):
+        while True:
+            val = input(question + '?\n')
+            try:
+                return open(val).read()
+            except:
+                print('unfortunatly I was not able to open %s' % val)
+    def _ask_string(self, question):
+        response = input(question + '?')
     def _ask_and_confirm(self, question):
         while True:
-            response = input(question + '?')
-            if self._ask_bool('Are you sure, %s?' % response):
+            self._ask_string(question)
+            if self._ask_bool('Are you sure, %s' % response):
                 return response
     def _ask_bool(self, question):
         while True:
